@@ -1,0 +1,473 @@
+<html class="no-js" lang="en">
+<head>
+<title>Interactive NMR Isotope and Frequency Map - NYU</title>
+
+<!-- next: use downloaded jQuery / Plotly -->
+
+<link href="template-modif2.css" rel="stylesheet">
+
+<!-- <script 
+        src="https://code.jquery.com/jquery-3.2.1.min.js"
+        integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+        crossorigin="anonymous"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+-->
+<script 
+        src="LIBS/jquery-3.2.1.min.js"
+        integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+        crossorigin="anonymous"></script>
+<script src="LIBS/plotly-latest.min.js"></script>
+
+
+
+<script type="text/javascript">
+
+// next: select nuclei based on spin value
+// perhaps also separate plots for different spin values
+// update on mouse up?
+
+
+$(document).ready(function() {
+    // MyBlah("hello");
+
+    var timerid; 
+    var gamma=2.675e8;   
+
+    $("#prot_frequ").on("input",function(e){
+        var value = $(this).val();
+        if($(this).data("lastval")!= value){
+
+        $(this).data("lastval",value);        
+        clearTimeout(timerid);
+
+        timerid = setTimeout(function() {
+            B0field=value*1.0e6*2.0*Math.PI/gamma;
+            $("#magn_field").val(B0field);
+            // alert(value);  
+            // alert(value.replace(/\D/g,'')); // not working
+        },500);
+      };
+    });
+
+    $("#magn_field").on("input",function(e){
+        var value = $(this).val();
+        if($(this).data("lastval")!= value){
+
+        $(this).data("lastval",value);        
+        clearTimeout(timerid);
+
+        timerid = setTimeout(function() {
+            nu0=value*gamma/1.0e6/2.0/Math.PI;
+            $("#prot_frequ").val(nu0);
+            //alert(value);  
+        },500);
+      };
+    });
+
+    // document.querySelector("input").addEventListener("keyup", function () {
+    //     this.value = this.value.replace(/\D/g, "blah")
+    // });
+    // $("#prot_frequ").keyup(function () { 
+    //     var newValue = $(this).val().replace(/[^0-9]/g,'');
+    //     $(this).val(newValue);    
+    // });  
+
+    // $('#prot_frequ').keypress(function(key) {
+    //     if(key.charCode < 48 || key.charCode > 57) {return false;}
+    // });
+
+    $("#isotope-table tr").remove(); 
+    populate_table();
+
+    $("#update-button").click( function()
+           {
+             $("#isotope-table tr").remove();
+             populate_table();
+             // list_checked();
+           }
+      );
+
+
+
+}); /* end of document.ready */
+//////////////////////////////////////////
+
+function list_checked() {
+
+  var str='spin12'+$("#spin12").prop('checked')+'<br>'+
+  'spin1'+$("#spin1").prop('checked')+'<br>'+
+  'spin32'+$("#spin32").prop('checked')+'<br>'+
+  'spin52'+$("#spin52").prop('checked')+'<br>'+
+  'spin72'+$("#spin72").prop('checked')+'<br>'+
+  'spin92'+$("#spin92").prop('checked');
+
+    $("#checkbox-result").html(str);
+
+    if($("#spin12").prop('checked')){
+      $("#checkbox-result").html('spin12 checked');
+    }
+}
+
+function populate_table() {
+
+  rowadd='<tr><td><b>Isotope</b></td>'+
+  '<td><b>Symbol</b></td>'+
+  '<td><b>Name</b></td>'+
+  '<td><b>Spin</b></td>'+
+  '<td><b>Natural<br> Abund. %</b></td>'+
+  '<td><b>Receptivity<br> (rel. to <sup>13</sup>C)</b></td>'+
+  '<td><b>Magnetic<br> Moment</b></td>'+
+  '<td><b>Gamma<br> (x 10<sup>7</sup><br> rad/Ts)</b></td>'+
+  '<td><b>Quadrup.<br> Moment<br> Q/fm<sup>2</sup></b></td>'+
+  '<td><b>Frequency</b></td>'+
+  '<td><b>Reference</b></td>'+
+  '</tr>';
+
+  $('#isotope-table').append(rowadd);
+
+  nu0=$("#prot_frequ").val();
+  idx=0;
+  label=[];
+  frequ=[];
+  receptivity=[];
+  data_collected={};
+
+  for (idx_keys=0; idx_keys<checkbox_vec.length; idx_keys++){
+    if ($("#"+checkbox_vec[idx_keys]).prop('checked')){
+      // data_collected{"testkey"}=1;
+      var legendtext=spin[idx_keys];
+      if (checkbox_vec[idx_keys]=='spin1'){
+        legendtext='1,2,3,...'
+      }
+      data_collected[checkbox_vec[idx_keys]]={
+          x: [],
+          y: [],
+          mode: 'markers+text',
+          name: legendtext, // this is actually the name for the legend, need to nme spin 1 -> integer
+          text: [],
+          textposition: 'bottom',
+          type: 'scatter'
+      };
+    }
+  }
+
+
+  for (var rows=0; rows<isotope_table.length; rows++){
+    var spin_idx=isotope_table[rows][4]*2-1;
+    if($("#"+checkbox_vec[spin_idx]).prop('checked')){
+
+      var rowadd='<tr>';
+
+      isotope_frequ=isotope_table[rows][5]*nu0/100.0; // in MHz
+      //$posx[$i]=$tbl[$i*$numberoffields+5]*$prot_frequ/100;
+
+      rowadd=rowadd+"<td align=\"right\">"+isotope_table[rows][0]+"</td>";
+      rowadd=rowadd+"<td>"+isotope_table[rows][1]+"</td>";
+      rowadd=rowadd+"<td>"+isotope_table[rows][2]+"</td>";
+      rowadd=rowadd+"<td align=\"right\">"+spin[isotope_table[rows][4]*2-1]+"</td>";
+      rowadd=rowadd+"<td align=\"right\">"+isotope_table[rows][6].toFixed(5)+"</td>";
+
+      // receptivity too low or unknown, display dash
+      if (isotope_table[rows][3]==0) {
+          rowadd=rowadd+ "<td align=\"right\"> --- </td>";
+      }
+      else {
+        // since have to exclude those with very low receptivity, better to make new list for labels, coords
+        label[idx]=isotope_table[rows][0]+isotope_table[rows][1];
+        frequ[idx]=isotope_frequ;
+
+
+        data_collected[checkbox_vec[spin_idx]]['x'].push(isotope_frequ);
+        data_collected[checkbox_vec[spin_idx]]['text'].push(isotope_table[rows][0]+isotope_table[rows][1]);
+
+
+        // here set the individual trace checkbox_vec[spin_idx]
+
+        // fix problem with receptivities, for some reason quadr. nuclei in table listed wrt 1H only
+
+        if (isotope_table[rows][4]==0.5){
+         isotope_receptivity=isotope_table[rows][3];
+        } else {
+            isotope_receptivity=isotope_table[rows][3]/1.7e-4;
+        }
+  
+        receptivity[idx]=isotope_receptivity;
+        data_collected[checkbox_vec[spin_idx]]['y'].push(isotope_receptivity);
+
+        rowadd=rowadd+ "<td align=\"right\">"+isotope_receptivity.toFixed(5)+"</td>";
+        idx=idx+1;
+
+      }
+
+      if (isotope_table[rows][8]==0) {
+      rowadd=rowadd+ "<td align=\"right\"> --- </td>";
+      } else {
+        rowadd=rowadd+ "<td align=\"right\">"+isotope_table[rows][8].toFixed(5)+"</td>";
+      }
+      if (isotope_table[rows][7]==0) {
+          rowadd=rowadd+ "<td align=\"right\"> --- </td>";
+      } else {
+        rowadd=rowadd+ "<td align=\"right\">"+isotope_table[rows][7].toFixed(5)+"</td>";
+      }
+      if (isotope_table[rows][9]==0) {
+      rowadd=rowadd+ "<td align=\"right\"> --- </td>";
+      } else {
+        rowadd=rowadd+ "<td align=\"right\">"+isotope_table[rows][9].toFixed(5)+"</td>";
+      }
+      rowadd=rowadd+"<td align=\"right\">"+isotope_frequ.toFixed(3)+"</td>";
+      rowadd=rowadd+"<td>"+isotope_table[rows][10].replace(/(\d+)/g, '<sub>$1</sub>');+"</td>";
+
+      console.log(rowadd);
+      $('#isotope-table').append(rowadd);
+    }
+  }
+
+
+  // now add plot
+  var trace = {
+    x: frequ,
+    y: receptivity,
+    mode: 'markers+text',
+    name: 'Isotope frequency and receptivity', // this is actually the name for the legend
+    text: label,
+    textposition: 'bottom',
+    type: 'scatter'
+  };
+
+
+  var sepdata = [];
+
+  for (var key in data_collected) {
+    if (data_collected.hasOwnProperty(key)) {
+      sepdata.push(data_collected[key]);  
+    }
+  }
+
+  var data = [trace];
+  var layout = {showlegend: true, xaxis: {title: 'Frequency (MHz)'},yaxis: {title: 'Receptivity (rel to 13C)',type: 'log'}};
+  Plotly.newPlot('plot-div', sepdata, layout);
+  // removing Aa symbol under legend
+  $("#plot-div").find("g.pointtext").find("text").css("visibility", "hidden");
+
+}
+
+function MyBlah(blah) {
+    alert(blah);
+}
+
+</script>
+
+</head>
+
+<!-- ----------------------------------------------------------------------------- -->
+<body>
+
+<script type="text/javascript">
+  
+  // initialization code
+  // $wtV $symbolV $nameV $receptV $spinV $larmorV $natabV $gammaV $momentV $quadV refcompd
+  // #  0     1       2        3       4      5        6        7     8        9     10
+
+  isotope_table=[[191,"Ir","Iridium",1.09e-05,1.5,1.718,37.3,0.4812,0.1946,81.6,""],
+[197,"Au","Gold",2.77e-05,1.5,1.729,100,0.473060,0.191271,54.7,""],
+[235,"U","Uranium",0,3.5,1.8414,0.7200,-0.52,-0.43,493.6,""],
+[193,"Ir","Iridium",2.34e-05,1.5,1.871,62.7,0.5227,0.2113,75.1,""],
+[187,"Os","Osmium",0.00143,0.5,2.282331,1.96,0.6192895,0.1119804,0,"OsO4"],
+[179,"Hf","Hafnium",7.45e-05,4.5,2.517,13.62,-0.6821,-0.7085,379.3,""],
+[41,"K","Potassium",5.68e-06,1.5,2.561305,6.7302,0.68606808,0.27739609,7.11,"KCl"],
+[167,"Er","Erbium",0,3.5,2.88,22.93,-0.77157,-0.63935,356.5,""],
+[155,"Gd","Gadolinium",0,1.5,3.07,14.80,-0.82132,-0.33208,127.0,""],
+[103,"Rh","Rhodium",0.186,0.5,3.186447,100,-0.8468,-0.1531,0,"Rh(acac)3"],
+[57,"Fe","Iron",0.00425,0.5,3.237778,2.119,0.8680624,0.1569636,0,"Fe(CO)5"],
+[145,"Nd","Neodymium",0,3.5,3.36,8.3,-0.898,-0.744,-33.0,""],
+[161,"Dy","Dysprosium",0,2.5,3.44,18.91,-0.9201,-0.5683,250.7,""],
+[149,"Sm","Samarium",0,3.5,3.44,13.82,-0.9192,-0.7616,7.4,""],
+[73,"Ge","Germanium",0.000109,4.5,3.488315,7.73,-0.9360303,-0.9722881,-19.6,"(CH3)4Ge"],
+[83,"Kr","Krypton",0.000218,4.5,3.8476,11.49,-1.03310,-1.07311,25.9,"Kr "],
+[177,"Hf","Hafnium",0.000261,3.5,4.007,18.60,1.086,0.8997,336.5,""],
+[157,"Gd","Gadolinium",0,1.5,4.03,15.65,-1.0769,-0.4354,135.0,""],
+[107,"Ag","Silver",0.205,0.5,4.047819,51.839,-1.0889181,-0.19689893,0,"AgNO3"],
+[183,"W","Tungsten",0.0631,0.5,4.166387,14.31,1.1282403,0.20400919,0,"Na2WO4"],
+[147,"Sm","Samarium",0,3.5,4.17,14.99,-1.115,-0.9239,-25.9,""],
+[87,"Sr","Strontium",0.00019,4.5,4.333822,7.00,-1.1639376,-1.2090236,33.5,"SrCl2"],
+[105,"Pd","Palladium",0.000253,2.5,4.5761,22.33,-1.23,-0.76,66.0,"K2PdCl6"],
+[99,"Ru","Ruthenium",0.000144,2.5,4.605151,12.76,-1.229,-0.7588,7.9,"K4[Ru(CN)6]"],
+[109,"Ag","Silver",0.29,0.5,4.653533,48.161,-1.2518634,-0.22636279,0,"AgNO3"],
+[39,"K","Potassium",0.000476,1.5,4.666373,93.2581,1.2500608,0.50543376,5.85,"KCl"],
+[163,"Dy","Dysprosium",0,2.5,4.82,24.90,1.289,0.7958,264.8,""],
+[173,"Yb","Ytterbium",0,2.5,4.821,16.13,-1.3025,-0.80446,280.0,""],
+[89,"Y","Yttrium",0.7,0.5,4.900198,100,-1.3162791,-0.23801049,0,"Y(NO3)3"],
+[101,"Ru","Ruthenium",0.000271,2.5,5.161369,17.06,-1.377,-0.8505,45.7,"K4[Ru(CN)6]"],
+[143,"Nd","Neodymium",0,3.5,5.45,12.2,-1.457,-1.208,-63.0,""],
+[47,"Ti","Titanium",0.000156,2.5,5.637534,7.44,-1.5105,-0.93294,30.2,"TiCl4"],
+[49,"Ti","Titanium",0.000205,3.5,5.639037,5.41,-1.51095,-1.25201,24.7,"TiCl4"],
+[53,"Cr","Chromium",8.63e-05,1.5,5.652496,9.501,-1.5152,-0.61263,-15.0,"K2CrO4"],
+[40,"K","Potassium",6.12e-07,4,5.802018,0.0117,-1.5542854,-1.4513203,-7.3,"KCl"],
+[25,"Mg","Magnesium",0.000268,2.5,6.121635,10.00,-1.63887,-1.0122,19.94,"MgCl2"],
+[67,"Zn","Zinc",0.000118,2.5,6.256803,4.10,1.676688,1.035556,15.0,"Zn(NO3)2"],
+[95,"Mo","Molybdenium",0.000521,2.5,6.516926,15.92,-1.751,-1.082,-2.2,"Na2MoO4"],
+[201,"Hg","Mercury",0.000197,1.5,6.611583,13.18,-1.788769,-0.7232483,38.6," (CH3)2Hg"],
+[97,"Mo","Molybdenium",0.000333,2.5,6.653695,9.55,-1.788,-1.105,25.5,"Na2MoO4"],
+[43,"Ca","Calcium",8.68e-06,3.5,6.730029,0.135,-1.803069,-1.494067,-4.08,"CaCl2"],
+[14,"N","Nitrogen",0.001,1,7.226317,99.632,1.9337792,0.57100428,2.044,"CH3NO2 "],
+[33,"S","Sulfur",1.72e-05,1.5,7.676,0.76,2.055685,0.8311696,-6.78,"(NH4)2SO4"],
+[189,"Os","Osmium",0.000395,1.5,7.7654,16.15,2.10713,0.85197,85.6,"OsO4"],
+[21,"Ne","Neon",6.65e-06,1.5,7.894296,0.27,-2.11308,-0.854376,10.155,"Ne"],
+[176,"Lu","Lutetium",0,7,8.131,2.59,2.1684,3.388,497.0,""],
+[37,"Cl","Chlorine",0.000659,1.5,8.155725,24.22,2.184368,0.8831998,-6.435,"NaCl"],
+[131,"Xe","Xenon",0.000596,1.5,8.243921,21.18,2.209076,0.8931899,-11.4,"XeOF4"],
+[169,"Tm","Thulium",0,0.5,8.29,100,-2.218,-0.4011,0,""],
+[61,"Ni","Nickel",4.09e-05,1.5,8.936051,1.1399,-2.3948,-0.96827,16.2,"Ni(CO)4"],
+[91,"Zr","Zirconium",0.00107,2.5,9.296298,11.22,-2.49743,-1.54246,-17.6,"Zr(C5H5)2Cl2"],
+[85,"Rb","Rubidium",0.00767,2.5,9.654943,72.17,2.5927050,1.6013071,27.6,"RbCl"],
+[35,"Cl","Chlorine",0.00358,1.5,9.797909,75.78,2.624198,1.061035,-8.165,"NaCl"],
+[135,"Ba","Barium",0.00033,1.5,9.934457,6.592,2.67550,1.08178,16.0,"BaCl2"],
+[50,"V","Vanadium",0.000139,6,9.970309,0.250,2.6706490,3.613757,21.0,"VOCl3"],
+[15,"N","Nitrogen",0.0225,0.5,10.136767,0.368,-2.71261804,-0.49049746,0,"MeNO2"],
+[10,"B","Boron",0.00395,3,10.743658,19.9,2.8746786,2.0792055,8.459,"BF3.Et2O"],
+[153,"Eu","Europium",0,2.5,10.98,52.19,2.9369,1.8139,241.2,""],
+[137,"Ba","Barium",0.000787,1.5,11.112928,11.232,2.99295,1.21013,24.5,"BaCl2"],
+[175,"Lu","Lutetium",0,3.5,11.404,97.41,3.0552,2.5316,349.0,""],
+[181,"Ta","Tantalum",0.0374,3.5,11.9896,99.988,3.2438,2.6879,317.0,"KTaCl6"],
+[123,"Sb","Antimony",0.0199,3.5,12.959217,42.79,3.4892,2.8912,-49.0,"KSbCl6"],
+[133,"Cs","Cesium",0.0484,3.5,13.116142,100,3.5332539,2.9277407,-0.343,"CsNO3"],
+[138,"La","Lanthanum",8.46e-05,5,13.1943,0.090,3.557239,4.068095,45.0,"LaCl3"],
+[17,"O","Oxygen",1.11e-05,2.5,13.556457,0.038,-3.62808,-2.24077,-2.558,"D2O"],
+[9,"Be","Beryllium",0.0139,1.5,14.051813,100,-3.759666,-1.520136,5.288,"BeSO4"],
+[139,"La","Lanthanum",0.0605,3.5,14.125641,99.910,3.8083318,3.155677,20.0,"LaCl3"],
+[6,"Li","Lithium",0.000645,1,14.716086,7.59,3.9371709,1.1625637,-0.0808,"LiCl"],
+[2,"H","Deuterium",1.11e-06,1,15.350609,0.0115,4.10662791,1.21260077,0.2860,"(CD3)4Si"],
+[209,"Bi","Bismuth",0.144,4.5,16.069288,100,4.3750,4.5444,-51.6,"Bi(NO3)2"],
+[75,"As","Arsenic",0.0254,1.5,17.122614,100,4.596163,1.858354,31.4,"NaAsF6"],
+[171,"Yb","Ytterbium",0,0.5,17.499306,14.28,4.7288,0.85506,0,""],
+[199,"Hg","Mercury",5.89,0.5,17.910822,16.87,4.8457916,0.87621937,0,"Me2Hgr"],
+[77,"Se","Selenium",3.15,0.5,19.071513,7.63,5.1253857,0.92677577,0,"Me2Se"],
+[29,"Si","Silicon",2.16,0.5,19.867187,4.6832,-5.3190,-0.96179,0,"Me4Si"],
+[127,"I","Iodine",0.0954,2.5,20.007486,100,5.389573,3.32871,-71.0,"KI"],
+[207,"Pb","Lead",11.8,0.5,20.920599,22.1,5.58046,1.00906,0,"Me4Pb"],
+[111,"Cd","Cadmium",7.27,0.5,21.21548,12.80,-5.6983131,-1.0303729,0,"Me2Cd"],
+[165,"Ho","Holmium",0,3.5,21.34,100,5.710,4.732,358.0,""],
+[195,"Pt","Platinum",20.7,0.5,21.496784,33.832,5.8385,1.0557,0,"Na2PtCl6"],
+[113,"In","Indium",0.0151,4.5,21.865755,4.29,5.8845,6.1124,79.9,"In(NO3)3"],
+[115,"In","Indium",0.338,4.5,21.912629,95.71,5.8972,6.1256,81.0,"In(NO3)3"],
+[113,"Cd","Cadmium",7.94,0.5,22.193175,12.22,-5.9609155,-1.0778568,0,"Me2Cd"],
+[99,"Tc","Technetium",0,4.5,22.508326,0,6.046,6.281,-12.9,"NH4TcO4"],
+[185,"Re","Rhenium",0.0519,2.5,22.5246,37.40,6.1057,3.771,218.0,"KReO4"],
+[187,"Re","Rhenium",0.0895,2.5,22.7516,62.60,6.1682,3.8096,207.0,"KReO4"],
+[59,"Co","Cobalt",0.278,3.5,23.727074,100,6.332,5.247,42.0,"K3[Co(CN)6]"],
+[121,"Sb","Antimony",0.0933,2.5,23.930577,57.21,6.4435,3.9796,-36.0,"KSbCl6"],
+[69,"Ga","Gallium",0.0419,1.5,24.001354,60.108,6.438855,2.603405,17.1,"Ga(NO3)3"],
+[159,"Tb","Terbium",0,1.5,24.04,100,6.431,2.6,143.2,""],
+[45,"Sc","Scandium",0.302,3.5,24.291747,100,6.5087973,5.3933489,-22.0,"Sc(NO3)3"],
+[93,"Nb","Niobium",0.488,4.5,24.47617,100,6.5674,6.8217,-32.0,"K[NbCl6]"],
+[55,"Mn","Manganese",0.179,2.5,24.789218,100,6.6452546,4.1042437,33.0,"KMnO4"],
+[151,"Eu","Europium",0,2.5,24.86,47.81,6.6510,4.1078,90.3,""],
+[79,"Br","Bromine",0.0403,1.5,25.05398,50.69,6.725616,2.719351,31.3,"NaBr"],
+[13,"C","Carbon",1,0.5,25.14502,1.07,6.728284,1.216613,0,"Me4Si"],
+[27,"Al","Aluminum",0.207,2.5,26.056859,100,6.9762715,4.3086865,14.66,"Al(NO3)3"],
+[123,"Te","Tellurium",0.961,0.5,26.169742,0.89,-7.059098,-1.276431,0,"Me2Te"],
+[51,"V","Vanadium",0.383,3.5,26.302948,99.750,7.0455117,5.8380835,-5.2,"VOCl3"],
+[23,"Na","Sodium",0.0927,1.5,26.4519,100,7.0808493,2.8629811,10.4,"NaCl"],
+[63,"Cu","Copper",0.065,1.5,26.515473,69.17,7.1117890,2.8754908,-22.0,"[Cu(CH3CN)4][ClO4]"],
+[81,"Br","Bromine",0.0491,1.5,27.006518,49.31,7.249776,2.931283,26.2,"NaBr"],
+[129,"Xe","Xenon",33.6,0.5,27.810186,26.44,-7.452103,-1.347494,0,"XeOF4"],
+[65,"Cu","Copper",0.0354,1.5,28.403693,30.83,7.60435,3.07465,-20.4,"[Cu(CH3CN)4][ClO4]"],
+[71,"Ga","Gallium",0.0571,1.5,30.496704,39.892,8.181171,3.307871,10.7,"Ga(NO3)3"],
+[141,"Pr","Praseodymium",0,2.5,30.62,100,8.1907,5.0587,-5.89,""],
+[125,"Te","Tellurium",13.4,0.5,31.549769,7.07,-8.5108404,-1.538936,0,"Me2Te"],
+[11,"B","Boron",0.132,1.5,32.083974,80.1,8.5847044,3.4710308,4.059,"BF3.Et2O"],
+[115,"Sn","Tin",0.711,0.5,32.718749,0.34,-8.8013,-1.5915,0,"Me4Sn"],
+[87,"Rb","Rubidium",0.0493,1.5,32.720454,27.83,8.786400,3.552582,13.35,"RbCl"],
+[117,"Sn","Tin",20.8,0.5,35.632259,7.68,-9.58879,-1.73385,0,"Me4Sn"],
+[119,"Sn","Tin",26.6,0.5,37.290632,8.59,-10.0317,-1.81394,0,"Me4Sn"],
+[7,"Li","Lithium",0.271,1.5,38.863797,92.41,10.3977013,4.20407505,-4.01,"LiCl"],
+[31,"P","Phosphorus",391,0.5,40.480742,100,10.8394,1.95999,0,"H3PO4"],
+[203,"Tl","Thallium",340,0.5,57.1232,29.524,15.5393338,2.80983305,0,"Tl(NO3)3"],
+[205,"Tl","Thallium",836,0.5,57.683838,70.476,15.6921808,2.83747094,0,"Tl(NO3)3"],
+[3,"He","Helium",0.00356,0.5,76.179437,0.000137,-20.3801587,-3.685154336,0,"He"],
+[19,"F","Fluorine",4900,0.5,94.094011,100,25.18148,4.553333,0,"CCl3F"],
+[1,"H","Hydrogen",5870,0.5,100,99.9885,26.7522128,4.83735357,0,"Me4Si"],
+[3,"H","Tritium",0,0.5,106.663974,0,28.5349779,5.159714367,0,"Me4Si-t1"]];
+
+
+spin=["1/2","1","3/2","2","5/2","3","7/2","4","9/2","5","11/2","6","13/2","7"];
+checkbox_vec=['spin12','spin1','spin32','spin1','spin52','spin1','spin72','spin1','spin92','spin1','--','spin1','--','spin1'];
+
+
+</script>
+
+<!-- ----------------------------------------------------------------------------- -->
+
+<div id="container">
+
+<div id="entry-div">
+
+<div class="form-style-5">
+<h1>NMR Isotopes and Frequencies</h1>
+</div>
+
+<div class="form-style-5">
+<form>
+
+<fieldset>
+<legend>
+
+<span class="number">1</span>
+Select Frequency / Field</legend>
+
+<span style="text-align:center">
+<sup>1</sup>H Larmor Frequency <input type="number" id="prot_frequ" max="100000" style="width: 100px" step="any" min="0" value="400"> MHz <br>
+</span>
+<span style="text-align:center">
+Magnetic Field <input type="number" id="magn_field" max="100000" style="width: 100px" step="any" min="0" value="9.4"> Tesla <br>
+</span>
+
+     
+</fieldset>
+<fieldset>
+<legend><span class="number">2</span> Spin Type</legend>
+
+<label><input type="checkbox" id="spin12" name="spin12" value="1" checked="checked" /> spin 1/2 nuclei  </label>
+<label><input type="checkbox" id="spin1" name="spin1" value="1" checked="checked" /> integer spins (1,3,6,7)  </label>
+<label><input type="checkbox" id="spin32" name="spin32" value="1" checked="checked" /> spin 3/2 nuclei  </label>
+<label><input type="checkbox" id="spin52" name="spin52" value="1" checked="checked" /> spin 5/2 nuclei</label>
+<label><input type="checkbox" id="spin72" name="spin72" value="1" checked="checked" /> spin 7/2 nuclei  </label>
+<label><input type="checkbox" id="spin92" name="spin92" value="1" checked="checked" /> spin 9/2 nuclei</label>
+
+</fieldset>
+<!-- <input type="submit" value="Update" /> -->
+<input type="button" id='update-button' value="update" />
+</form>
+
+</div>
+
+  <div class="form-style-5">
+Based on the  <a href="http://www.iupac.org/publications/pac/2001/7311/7311x1795.html">IUPAC-recommended
+data</a>, Pure Appl. Chem., 73, 2001, 1795-1818, by Harris, Becker, De
+Menezes, Goodfellow and Granger.<br><p>
+
+written by <a href="http://wp.nyu.edu/jerschow">Alexej Jerschow</a>, using the Plotly and jQuery libraries.  <p>
+
+An iOS App written by Jae-Seung Lee is available <a href=" https://itunes.apple.com/us/app/id1146296877">here</a>.
+  </div>
+
+  <div id='checkbox-result'></div>
+</div>
+
+
+<div id="plot-div">
+</div>
+
+
+</div>
+
+<!-- <div id="isotope-table-section"> -->
+  <table id="isotope-table" class="isotope-table-class">
+</table>
+<!-- </div> -->
+
+
+
+
+</body>
+</html>
